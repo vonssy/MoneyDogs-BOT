@@ -2,7 +2,7 @@ import requests
 import json
 import os
 from colorama import *
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import time
 import pytz
 
@@ -52,7 +52,7 @@ class MoneyDOGS:
     
     def get_token(self, query: str):
         url = 'https://api.moneydogs-ton.com/sessions'
-        data = json.dumps({ 'encodedMessage': query })
+        data = json.dumps({'encodedMessage':query, 'retentionCode':'48cdRxLi'})
         self.headers.update({
             'Content-Length': str(len(data)),
             'Content-Type': 'application/json'
@@ -66,7 +66,7 @@ class MoneyDOGS:
             return None
         
     def user_info(self, token: str):
-        url = 'https://api.moneydogs-ton.com/rankings/deposits/me'
+        url = 'https://api.moneydogs-ton.com/mdogs-deposits'
         self.headers.update({
             'Content-Length': '0',
             'Content-Type': 'application/json',
@@ -95,8 +95,9 @@ class MoneyDOGS:
         else:
             return None
         
-    def get_tasks(self, token: str):
-        url = 'https://api.moneydogs-ton.com/tasks'
+    def get_tasks(self, token: str, task_type: str = 'all'):
+        base_url = 'https://api.moneydogs-ton.com/tasks'
+        url = f"{base_url}?isFeatured=true" if task_type == 'featured' else base_url
         self.headers.update({
             'Content-Length': '0',
             'Content-Type': 'application/json',
@@ -118,111 +119,98 @@ class MoneyDOGS:
         })
 
         response = self.session.post(url, headers=self.headers)
-        if response.status_code == 201:
+        if response.status_code in [200, 201]:
             return True
-        elif response.status_code == 200:
-            try:
-                data = response.json()
-                return data
-            except ValueError:
-                return True
         else:
-            return False
+            return None
         
     def process_query(self, query: str):
         token = self.get_token(query)
-
-        user_info = self.user_info(token)
-        if user_info:
-            first_name = user_info['firstName']
-            balance = f"{user_info['score']:.4f}"
+        if not token:
             self.log(
-                f"{Fore.CYAN + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {first_name} {Style.RESET_ALL}"
-                f"{Fore.CYAN + Style.BRIGHT}] {Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Balance{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {balance} MDOGS {Style.RESET_ALL}"
+                f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
+                f"{Fore.RED + Style.BRIGHT} Query ID Isn't Valid {Style.RESET_ALL}"
                 f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
             )
-        else:
-            self.log(f"[ User Not Found ]")
+            return
 
-        print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-            f"{Fore.YELLOW + Style.BRIGHT}[ Get Daily Check-in... ]{Style.RESET_ALL}",
-            end="\r",
-            flush=True
-        )
-        time.sleep(1.5)
-        checkin = self.daily_checkin(token)
-        if checkin:
-            reward = checkin['rewardMdogs']
-            self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Check-in{Style.RESET_ALL}"
-                f"{Fore.GREEN + Style.BRIGHT} Success {Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT}] [ Reward{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {reward} MDOGS {Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
-            )
-        else:
-            self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Check-in{Style.RESET_ALL}"
-                f"{Fore.YELLOW + Style.BRIGHT} Already Check-in Today {Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}      "
-            )
+        if token:
+            user = self.user_info(token)
+            if user:
+                self.log(
+                    f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} {user['user']['firstName']} {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}] [ Balance{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} {user['remainingAmount']:.4f} $MDOGS {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                )
+                time.sleep(1)
 
-        print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-            f"{Fore.YELLOW + Style.BRIGHT}[ Get Available Tasks... ]{Style.RESET_ALL}",
-            end="\r",
-            flush=True
-        )
-        time.sleep(1.5)
-        tasks = self.get_tasks(token)
-        manual_task = False
-        if tasks:
-            for task in tasks:
-                task_id = task['id']
-                title = task['title']
-
-                if task['code'] is None:
-                    print(
-                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT}[ Task{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {title} {Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT}is Strarting...{Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}",
-                        end="\r",
-                        flush=True
+                checkin = self.daily_checkin(token)
+                if checkin:
+                    self.log(
+                        f"{Fore.MAGENTA + Style.BRIGHT}[ Check-in{Style.RESET_ALL}"
+                        f"{Fore.GREEN + Style.BRIGHT} Is Claimed {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA + Style.BRIGHT}] [ Reward{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} {checkin['rewardMdogs']} $MDOGS {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
                     )
-                    time.sleep(2)
-                    complete_task = self.complete_tasks(token, task_id)
-
-                    if complete_task:
-                        reward = int(task['rewardMdogs'])
-                        self.log(
-                            f"{Fore.MAGENTA + Style.BRIGHT}[ Task{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {title} {Style.RESET_ALL}"
-                            f"{Fore.GREEN + Style.BRIGHT}is Completed{Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {reward} MDOGS {Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}          "
-                        )
-                    else:
-                        self.log(
-                            f"{Fore.MAGENTA + Style.BRIGHT}[ Task{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {title} {Style.RESET_ALL}"
-                            f"{Fore.RED + Style.BRIGHT}is Failed{Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}                          "
-                        )
                 else:
-                    manual_task = True
+                    now = datetime.now(timezone.utc)
+                    checkin_time = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(wib).strftime('%x %X %Z')
+                    self.log(
+                        f"{Fore.MAGENTA + Style.BRIGHT}[ Check-in{Style.RESET_ALL}"
+                        f"{Fore.YELLOW + Style.BRIGHT} Not Time to Claim {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA + Style.BRIGHT}] [ Next Claim at{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} {checkin_time} {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                    )
+                time.sleep(1)
 
-            if manual_task:
-                self.log(f"{Fore.YELLOW + Style.BRIGHT}[ Tersisa Manual Task ]{Style.RESET_ALL}                       ")
+                for type in ['featured', 'all']:
+                    tasks = self.get_tasks(token, type)
+                    if tasks:
+                        for task in tasks:
+                            task_id = str(task['id'])
+
+                            if task:
+                                verify = self.complete_tasks(token, task_id)
+                                if verify:
+                                    self.log(
+                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {task['title']} {Style.RESET_ALL}"
+                                        f"{Fore.GREEN + Style.BRIGHT}Is Completed{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {task['rewardMdogs']:.1f} $MDOGS {Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                                    )
+                                else:
+                                    self.log(
+                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {task['title']} {Style.RESET_ALL}"
+                                        f"{Fore.RED + Style.BRIGHT}Isn't Completed{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                    )
+                                time.sleep(1)
+                    else:
+                        if tasks == 'featured':
+                            self.log(
+                                f"{Fore.MAGENTA + Style.BRIGHT}[ Partner Tasks{Style.RESET_ALL}"
+                                f"{Fore.GREEN + Style.BRIGHT} Is Completed {Style.RESET_ALL}"
+                                f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                            )
+                        else:
+                            self.log(
+                                f"{Fore.MAGENTA + Style.BRIGHT}[ General Tasks{Style.RESET_ALL}"
+                                f"{Fore.GREEN + Style.BRIGHT} Is Completed {Style.RESET_ALL}"
+                                f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                            )
+            else:
+                self.log(
+                    f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
+                    f"{Fore.RED + Style.BRIGHT} Data Is None {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                )
             
     def main(self):
         try:
@@ -236,15 +224,14 @@ class MoneyDOGS:
                     f"{Fore.GREEN + Style.BRIGHT}Account's Total: {Style.RESET_ALL}"
                     f"{Fore.WHITE + Style.BRIGHT}{len(queries)}{Style.RESET_ALL}"
                 )
-                self.log(f"{Fore.CYAN + Style.BRIGHT}-----------------------------------------------------------------------{Style.RESET_ALL}")
+                self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
 
                 for query in queries:
                     query = query.strip()
                     if query:
-                        print(f"{Fore.YELLOW+Style.BRIGHT}[ Getting User Query... ]{Style.RESET_ALL}", end="\r", flush=True)
-                        time.sleep(1.5)
                         self.process_query(query)
-                        self.log(f"{Fore.CYAN + Style.BRIGHT}-----------------------------------------------------------------------{Style.RESET_ALL}")
+                        self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
+                        time.sleep(3)
 
                 seconds = 1800
                 while seconds > 0:
