@@ -144,7 +144,7 @@ class MoneyDOGS:
                     f"{Fore.WHITE + Style.BRIGHT} {user['remainingAmount']:.4f} $MDOGS {Style.RESET_ALL}"
                     f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
                 )
-                time.sleep(1)
+                time.sleep(2)
 
                 checkin = self.daily_checkin(token)
                 if checkin:
@@ -165,15 +165,15 @@ class MoneyDOGS:
                         f"{Fore.WHITE + Style.BRIGHT} {checkin_time} {Style.RESET_ALL}"
                         f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
                     )
-                time.sleep(1)
+                time.sleep(2)
 
                 for type in ['featured', 'all']:
                     tasks = self.get_tasks(token, type)
-                    if tasks:
+                    if tasks is not None:
                         for task in tasks:
                             task_id = str(task['id'])
 
-                            if task:
+                            if task is not None:
                                 verify = self.complete_tasks(token, task_id)
                                 if verify:
                                     self.log(
