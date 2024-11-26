@@ -50,37 +50,57 @@ class MoneyDOGS:
         minutes, seconds = divmod(remainder, 60)
         return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
     
-    def get_token(self, query: str):
+    def get_token(self, query: str, retries=5):
         url = 'https://api.moneydogs-ton.com/sessions'
         data = json.dumps({'encodedMessage':query, 'retentionCode':'48cdRxLi'})
         self.headers.update({
-            'Content-Length': str(len(data)),
             'Content-Type': 'application/json'
         })
 
-        response = self.session.post(url, headers=self.headers, data=data)
-        data = response.json()
-        if response.status_code == 200:
-            return data['token']
-        else:
-            return None
+        for attempt in range(retries):
+            try:
+                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                response.raise_for_status()
+                return response.json()['token']
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT}[{attempt+1}/{retries}]{Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
         
-    def user_info(self, token: str):
+    def user_info(self, token: str, retries=5):
         url = 'https://api.moneydogs-ton.com/mdogs-deposits'
         self.headers.update({
-            'Content-Length': '0',
             'Content-Type': 'application/json',
             'X-Auth-Token': token
         })
 
-        response = self.session.get(url, headers=self.headers)
-        data = response.json()
-        if response.status_code == 200:
-            return data
-        else:
-            return None
+        for attempt in range(retries):
+            try:
+                response = self.session.get(url, headers=self.headers, timeout=10)
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT}[{attempt+1}/{retries}]{Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
         
-    def daily_checkin(self, token: str):
+    def daily_checkin(self, token: str, retries=5):
         url = 'https://api.moneydogs-ton.com/daily-check-in'
         self.headers.update({
             'Content-Length': '0',
@@ -88,41 +108,81 @@ class MoneyDOGS:
             'X-Auth-Token': token
         })
 
-        response = self.session.post(url, headers=self.headers)
-        data = response.json()
-        if response.status_code == 200:
-            return data
-        else:
-            return None
+        for attempt in range(retries):
+            try:
+                response = self.session.post(url, headers=self.headers, timeout=10)
+                if response.status_code == 400:
+                    return None
+                
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT}[{attempt+1}/{retries}]{Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
         
-    def get_tasks(self, token: str, task_type: str = 'all'):
+    def get_tasks(self, token: str, task_type: str = 'all', retries=5):
         base_url = 'https://api.moneydogs-ton.com/tasks'
         url = f"{base_url}?isFeatured=true" if task_type == 'featured' else base_url
+        self.headers.update({
+            'Content-Type': 'application/json',
+            'X-Auth-Token': token
+        })
+
+        for attempt in range(retries):
+            try:
+                response = self.session.get(url, headers=self.headers, timeout=10)
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT}[{attempt+1}/{retries}]{Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
+        
+    def complete_tasks(self, token: str, task_id: str, retries=5):
+        url = f'https://api.moneydogs-ton.com/tasks/{task_id}/verify'
         self.headers.update({
             'Content-Length': '0',
             'Content-Type': 'application/json',
             'X-Auth-Token': token
         })
 
-        response = self.session.get(url, headers=self.headers)
-        data = response.json()
-        if response.status_code == 200:
-            return data
-        else:
-            return None
-        
-    def complete_tasks(self, token: str, task_id: str):
-        url = f'https://api.moneydogs-ton.com/tasks/{task_id}/verify'
-        self.headers.update({
-            'Content-Type': 'application/json',
-            'X-Auth-Token': token
-        })
-
-        response = self.session.post(url, headers=self.headers)
-        if response.status_code in [200, 201]:
-            return True
-        else:
-            return None
+        for attempt in range(retries):
+            try:
+                response = self.session.post(url, headers=self.headers, timeout=10)
+                if response.status_code == 400:
+                    return None
+                
+                response.raise_for_status()
+                return True
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT}[{attempt+1}/{retries}]{Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
         
     def process_query(self, query: str):
         token = self.get_token(query)
@@ -136,6 +196,13 @@ class MoneyDOGS:
 
         if token:
             user = self.user_info(token)
+            if not user:
+                self.log(
+                    f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
+                    f"{Fore.RED + Style.BRIGHT} Data Is None {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                )
+
             if user:
                 self.log(
                     f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
@@ -144,7 +211,7 @@ class MoneyDOGS:
                     f"{Fore.WHITE + Style.BRIGHT} {user['remainingAmount']:.4f} $MDOGS {Style.RESET_ALL}"
                     f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
                 )
-                time.sleep(2)
+                time.sleep(1)
 
                 checkin = self.daily_checkin(token)
                 if checkin:
@@ -165,7 +232,7 @@ class MoneyDOGS:
                         f"{Fore.WHITE + Style.BRIGHT} {checkin_time} {Style.RESET_ALL}"
                         f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
                     )
-                time.sleep(2)
+                time.sleep(1)
 
                 for type in ['featured', 'all']:
                     tasks = self.get_tasks(token, type)
@@ -205,12 +272,6 @@ class MoneyDOGS:
                                 f"{Fore.GREEN + Style.BRIGHT} Is Completed {Style.RESET_ALL}"
                                 f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
                             )
-            else:
-                self.log(
-                    f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT} Data Is None {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
-                )
             
     def main(self):
         try:
