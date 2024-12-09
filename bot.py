@@ -166,7 +166,7 @@ class MoneyDOGS:
         for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, timeout=10)
-                if response.status_code == 400:
+                if response.status_code in [400, 429]:
                     return None
                 
                 response.raise_for_status()
