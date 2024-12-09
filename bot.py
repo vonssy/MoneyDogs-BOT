@@ -12,7 +12,7 @@ class MoneyDOGS:
     def __init__(self) -> None:
         self.session = requests.Session()
         self.headers = {
-            'Accept': 'application/json, text/plain, */*',
+            'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
             'Cache-Control': 'no-cache',
             'Host': 'api.moneydogs-ton.com',
@@ -202,6 +202,7 @@ class MoneyDOGS:
                     f"{Fore.RED + Style.BRIGHT} Data Is None {Style.RESET_ALL}"
                     f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
                 )
+                return
 
             if user:
                 self.log(
